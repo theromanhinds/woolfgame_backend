@@ -95,9 +95,15 @@ io.on('connection', (socket) => {
     gameRooms.set(roomID, room);
 
     // Emit updated player list to all clients in the lobby
-    socket.emit('updateRoom', room);
+    // socket.emit('updateRoom', room);
     io.to(roomID).emit('updateRoom', room);
     
+  });
+
+  socket.on('getRoom', (roomID) => {
+
+    room = gameRooms.get(roomID);
+    socket.emit('updateRoom', room);
   });
 
   socket.on('disconnect', () => {
@@ -127,10 +133,7 @@ io.on('connection', (socket) => {
 
       }
     }
-
    
-    
-    
   });
 
   socket.on('checkRoomExistence', (roomID, callback) => {
@@ -194,23 +197,19 @@ io.on('connection', (socket) => {
   });
   
   socket.on('clueSubmitted', (clue, roomID) => {
-    socket.to(roomID).emit("newClue", clue);
-   
+    console.log("sending new clue to players");
+    io.to(roomID).emit("newClue", clue);
   });
 
-  socket.on('checkTurnsComplete', (order, turnCount, roomID, callback) => {
-
-    if (turnCount == order.length){
-      callback(true); 
-    } else {
-      callback(false);
-    }
-
-
+  socket.on('incrementTurn', (newTurnNumber, roomID) => {
+      // Broadcast the updated turn number to all clients
+      io.to(roomID).emit('updateTurn', newTurnNumber);
+    
   });
 
   socket.on('allTurnsComplete', (roomID) => {
-    socket.emit('startVoting');
+    console.log("turns complete, starting voting");
+    io.to(roomID).emit('startVoting');
   });
 
   socket.on('playerVoted', (roomID, vote, order) => {
@@ -225,7 +224,7 @@ io.on('connection', (socket) => {
 
     if (votes.length === order.length) {
       const mostVoted = getMostVotedName(votes);
-
+      console.log("revealing answer to room");
       // Broadcast the most voted name to all clients
       io.to(roomID).emit('revealAnswer', mostVoted);
 
