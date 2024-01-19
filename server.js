@@ -8,7 +8,7 @@ const server = http.createServer(app);
 
 const io = require('socket.io')(server, {
   cors: {
-    origin: 'http://localhost:3000', // Replace with your client's origin
+    origin: 'https://woolfgametest.netlify.app/', // Replace with your client's origin
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -25,7 +25,7 @@ const io = require('socket.io')(server, {
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({
-  origin: 'http://localhost:3000', // Replace with your client's origin
+  origin: 'https://woolfgametest.netlify.app/', // Replace with your client's origin
   methods: ['GET', 'POST'],
   credentials: true,
   optionsSuccessStatus: 204,
