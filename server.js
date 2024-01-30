@@ -25,8 +25,18 @@ app.use(cors({
 
 const gameRooms = new Map();
 
+const gameTopics = ['Countries', 'Instruments', 'Geography', 'Animals', 'Artists', 'Sports', 'Apps', 'Weather', 'Music'];
+
 const gameBoards = new Map();
-gameBoards.set('Countries', ['America', 'England', 'Jamaica', 'Canada', 'France', 'Spain', 'Mexico', 'Italy', 'Argentina']);
+gameBoards.set('Countries', ['United States', 'England', 'Jamaica', 'France', 'Australia', 'Spain', 'Mexico', 'Italy', 'Argentina']);
+gameBoards.set('Instruments', ['Guitar', 'Piano', 'Drums', 'Violin', 'Voice', 'Saxophone', 'Flute', 'Trumpet', 'Ukulele']);
+gameBoards.set('Geography', ['Ocean', 'Desert', 'Forest', 'Jungle', 'Mountain', 'Lake', 'Swamp', 'Cave', 'Island']);
+gameBoards.set('Animals', ['Elephant', 'Giraffe', 'Lion', 'Wolf', 'Tiger', 'Eagle', 'Owl', 'Gorilla', 'Bear']);
+gameBoards.set('Artists', ['Taylor Swift', 'The Weeknd', 'Drake', 'Post Malone', 'Billie Eilish', 'Ed Sheern', 'Bad Bunny', 'Harry Styles', 'Miley Cyrus']);
+gameBoards.set('Sports', ['Soccer', 'American Football', 'Rugby', 'Tennis', 'Track & Field', 'Golf', 'Volleyball', 'Basketball', 'Cricket']);
+gameBoards.set('Apps', ['Spotify', 'Instagram', 'TikTok', 'Facebook', 'WhatsApp', 'Gmail', 'Discord', 'Snapchat', 'YouTube']);
+gameBoards.set('Weather', ['Rain', 'Fog', 'Sunny', 'Cloudy', 'Windy', 'Hail', 'Snow', 'Storm', 'Heat Wave']);
+gameBoards.set('Music', ['Pop', 'Hip Hop', 'Trap', 'R&B', 'Country', 'Gospel', 'Indie', 'Rock', 'Lofi']);
 
 const gameVotes = new Map();
 
@@ -57,92 +67,47 @@ app.get('/', (req, res) => {
 
 io.on('connection', (socket) => {
 
-  console.log("connected");
-
-  // Handle events from clients here
-
-  // create a lobby
+  //Create room
   socket.on('createRoom', (roomID, userName, callback) => {
 
+    //If room already exists, return
     if (gameRooms.has(roomID)) {
       return;
     }
-
+    //Else create room and join
     const room = [{id: socket.id, userName: userName, room: roomID, host: true}]
     gameRooms.set(roomID, room);
-
     socket.join(roomID);
-    // socket.emit('updateRoom', room);  
     callback(room);
   });
-
-  // Join a lobby
-  socket.on('joinRoom', (roomID, userName) => {
-
-    if (!gameRooms.has(roomID)) {
-      gameRooms.set(roomID, []);
-    }
-
-    const room = gameRooms.get(roomID);
   
-    if (room.length >= 8) {
-      socket.emit('roomFull'); //ADD FRONTEND FXN TO CATCH THIS ERROR
-      return;
-    }
-    
-    socket.join(roomID);
-    room.push({id: socket.id, userName: userName, room: roomID, host: false});
-    gameRooms.set(roomID, room);
-
-    // Emit updated player list to all clients in the lobby
-    // socket.emit('updateRoom', room);
-    io.to(roomID).emit('updateRoom', room);
-    
-  });
-
-  socket.on('getRoom', (roomID) => {
-
-    room = gameRooms.get(roomID);
-    socket.emit('updateRoom', room);
-  });
-
-  socket.on('disconnect', () => {
-
-    console.log("disconnected");
-
-    //find room of socket that disconnected
-    for (const [room, players] of gameRooms) {
-      const disconnectedPlayer = players.find(player => player.id === socket.id);
-
-      if (disconnectedPlayer) {
-        const updatedRoom = players.filter(player => player.id !== socket.id);
-
-        //if room now empty
-        if (updatedRoom.length == 0){
-          gameRooms.delete(disconnectedPlayer.room)
-          return;
-        }
-
-        if (disconnectedPlayer.host){
-          updatedRoom[0].host = true;
-        }
-
-        gameRooms.set(disconnectedPlayer.room, updatedRoom);
-        //update all players in room with new list
-        io.to(disconnectedPlayer.room).emit('updateRoom', updatedRoom);
-
-      }
-    }
-   
-  });
-
-  socket.on('checkRoomExistence', (roomID, callback) => {
-    // Perform logic to check if the room exists
+  
+  //Verify request to join room
+  socket.on('verifyJoinRoom', (roomID, callback) => {
     if (gameRooms.has(roomID)) {
+      const room = gameRooms.get(roomID);
+      if (room.length >= 8) {
+        callback(false);
+      }
       callback(true); 
     } else {
       callback(false);
     }
+  });
+
+  //Join room
+  socket.on('joinRoom', (roomID, userName) => {
+    socket.join(roomID);
+    const room = gameRooms.get(roomID);
+    room.push({id: socket.id, userName: userName, room: roomID, host: false});
+    gameRooms.set(roomID, room);
+    io.to(roomID).emit('updateRoom', room);
+  });
+
+  //NEED TO UNDERSTAND WHY THIS FUNCTION IS NEEDED
+  socket.on('getRoom', (roomID) => {
+    room = gameRooms.get(roomID);
+    socket.emit('updateRoom', room);
   });
 
   socket.on('startGame', (roomID) => {
@@ -154,7 +119,7 @@ io.on('connection', (socket) => {
       answer: null
     };
 
-    //SHUFFLE PLAYER ORDER
+    //Shuffle player order
     let playerList = gameRooms.get(roomID).slice(0);
     for (var i = playerList.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1));
@@ -165,13 +130,15 @@ io.on('connection', (socket) => {
 
     gameData.players = playerList;
 
-    //SET GAME BOARD AND CHOOSE ANSWER
-    //HARD-CODED FOR TESTING
-    gameData.topic = 'Countries';    
-    gameData.board = gameBoards.get('Countries'); //randomize in future
+    //AShuffle categories and select topic (TO BE IMPLEMENTED)
+    let gameTopicIndex = Math.floor(Math.random() * (gameTopics.length));
+    let chosenTopic = gameTopics[gameTopicIndex];
+    
+    gameData.topic = chosenTopic;    
+    gameData.board = gameBoards.get(chosenTopic);
 
-    //SHUFFLE BOARD WORDS AND SELECT ANSWER
-    let boardWords = gameBoards.get('Countries').slice(0);
+    //Shuffle board words and select answer
+    let boardWords = gameBoards.get(chosenTopic).slice(0);
     for (var i = boardWords.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1));
       var temp = boardWords[i];
@@ -180,8 +147,8 @@ io.on('connection', (socket) => {
     }
 
     gameData.answer = boardWords[0];
-
-    //SET PLAYER ROLES
+    
+    //Select player roles
     let woolfIndex = Math.floor(Math.random() * (playerList.length));
     for (let i = 0; i < playerList.length; i++) {
       if (i == woolfIndex){
@@ -191,31 +158,26 @@ io.on('connection', (socket) => {
       }
     }
 
-    //SEND GAME DATA TO ALL PLAYERS
     io.to(roomID).emit('gameStarted', gameData);
 
   });
   
-  socket.on('clueSubmitted', (clue, roomID) => {
-    console.log("sending new clue to players");
-    io.to(roomID).emit("newClue", clue);
+  socket.on('clueSubmitted', (clue, name, roomID) => {
+    io.to(roomID).emit("newClue", clue, name);
   });
 
   socket.on('incrementTurn', (newTurnNumber, roomID) => {
-      // Broadcast the updated turn number to all clients
-      io.to(roomID).emit('updateTurn', newTurnNumber);
-    
+    io.to(roomID).emit('updateTurn', newTurnNumber);
   });
 
   socket.on('allTurnsComplete', (roomID) => {
-    console.log("turns complete, starting voting");
     io.to(roomID).emit('startVoting');
   });
 
   socket.on('playerVoted', (roomID, vote, order) => {
 
     if (!gameVotes.has(roomID)){
-      gameVotes.set(roomID, [])
+      gameVotes.set(roomID, []);
     }
 
     const votes = gameVotes.get(roomID);
@@ -224,11 +186,8 @@ io.on('connection', (socket) => {
 
     if (votes.length === order.length) {
       const mostVoted = getMostVotedName(votes);
-      console.log("revealing answer to room");
-      // Broadcast the most voted name to all clients
       io.to(roomID).emit('revealAnswer', mostVoted);
 
-      // Clear the votes array for the next round
       gameVotes.set(roomID, []);
     }
 
@@ -252,10 +211,36 @@ io.on('connection', (socket) => {
   });
 
   socket.on('resetGame', (roomID) => {
-    
     const room = gameRooms.get(roomID);
     io.to(roomID).emit('updateRoom', room);
+  });
 
+  socket.on('disconnect', () => {
+
+    //find room of socket that disconnected
+    for (const [room, players] of gameRooms) {
+      const disconnectedPlayer = players.find(player => player.id === socket.id);
+
+      if (disconnectedPlayer) {
+        const updatedRoom = players.filter(player => player.id !== socket.id);
+
+        //if room now empty
+        if (updatedRoom.length == 0){
+          gameRooms.delete(disconnectedPlayer.room)
+          return;
+        }
+
+        if (disconnectedPlayer.host){
+          updatedRoom[0].host = true;
+        }
+
+        gameRooms.set(disconnectedPlayer.room, updatedRoom);
+        //update all players in room with new list
+        io.to(disconnectedPlayer.room).emit('playerDisconnected', updatedRoom, disconnectedPlayer.userName, disconnectedPlayer.id);
+
+      }
+    }
+   
   });
 
 });
@@ -263,3 +248,4 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
+
